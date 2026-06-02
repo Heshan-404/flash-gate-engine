@@ -2,6 +2,7 @@ use tokio::net::TcpStream;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use crate::protocol::http1::HttpRequest;
 use tokio::net::TcpListener;
+use socket2::{Socket, Domain, Type, Protocol};
 
 async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let mut buffer = [0u8; 4096];
@@ -41,11 +42,25 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn std::err
 }
 
 pub async fn start_tcp() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let listener = TcpListener::bind("0.0.0.0:8080").await?;
+    let socket = Socket::new(Domain::IPV4, Type::STREAM, Some(Protocol::TCP))?;
+    socket.set_reuse_address(true)?;
+    let address = "0.0.0.0:8080".parse::<std::net::SocketAddr>()?;
+    socket.bind(&address.into())?;
+    socket.listen(8192)?;
+    let std_listener: std::net::TcpListener = socket.into();
+    let listener = TcpListener::from_std(std_listener)?;
+    
     loop {
-        let (stream, _) = listener.accept().await?;
-        tokio::spawn(async move {
-            let _ = handle_connection(stream).await;
-        });
+        match listener.accept().await {
+            Ok((stream, _)) => {
+                tokio::spawn(async move {
+                    let _ = handle_connection(stream).await;
+                });
+            }
+            Err(_) => {
+                tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+            }
+        }
     }
 }
+
