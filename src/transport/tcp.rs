@@ -41,7 +41,7 @@ async fn handle_connection(mut stream: TcpStream) -> Result<(), Box<dyn std::err
 }
 
 pub async fn start_tcp() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let listener = TcpListener::bind("127.0.0.1:8080").await?;
+    let listener = TcpListener::bind("0.0.0.0:8080").await?;
     loop {
         let (stream, _) = listener.accept().await?;
         tokio::spawn(async move {
